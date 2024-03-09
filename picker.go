@@ -38,7 +38,7 @@ type Picker struct {
 }
 
 // NewPicker creates picker with pieces to pick from.
-func NewPicker(tSize, pMaxSize int) *Picker {
+func NewPicker(tSize int, pMaxSize int, pm *PieceManager) *Picker {
 	count := PieceCount(tSize, pMaxSize)
 	ordered := make([]int, count)
 
@@ -47,11 +47,10 @@ func NewPicker(tSize, pMaxSize int) *Picker {
 	}
 
 	rand := rand.New(rand.NewSource(time.Now().Unix()))
-	manager := NewPieceManager(tSize, pMaxSize)
 
 	return &Picker{tSize: tSize,
 		pMaxSize: pMaxSize,
-		manager:  manager,
+		manager:  pm,
 		ordered:  ordered,
 		rand:     rand}
 }
@@ -124,24 +123,6 @@ func (p *Picker) IncrementAvailability(have bitfield.Bitfield) {
 	}
 
 	p.orderPieces()
-}
-
-func (p *Picker) MarkBlockDone(pIndex int, bIndex int, peer string) {
-	p.Lock()
-	defer p.Unlock()
-
-	state := p.manager.PieceAt(pIndex)
-	state.blocks[bIndex].status = BlockDone
-	state.blocks[bIndex].peers = slices.DeleteFunc(state.blocks[bIndex].peers, func(e string) bool { return e == peer })
-
-	for _, block := range state.blocks {
-		if block.status != BlockDone {
-			return
-		}
-	}
-
-	state.status = PieceDone
-
 }
 
 func (p *Picker) IsBlockResolving(pIndex int, bIndex int) bool {

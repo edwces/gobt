@@ -1,5 +1,11 @@
 package gobt
 
+import (
+	"sync"
+
+	"golang.org/x/exp/slices"
+)
+
 type PieceStatus int
 type BlockStatus int
 
@@ -30,10 +36,35 @@ type PieceManager struct {
 	pMaxSize int
 
 	pieces map[int]*Piece
+
+	sync.Mutex
 }
 
 func NewPieceManager(tSize, pMaxSize int) *PieceManager {
 	return &PieceManager{pieces: map[int]*Piece{}, tSize: tSize, pMaxSize: pMaxSize}
+}
+
+func (p *PieceManager) MarkBlockDone(pi int, bi int, peer string) {
+	p.Lock()
+	defer p.Unlock()
+
+	piece := p.PieceAt(pi)
+	piece.blocks[bi].status = BlockDone
+	piece.blocks[bi].peers = slices.DeleteFunc(piece.blocks[bi].peers, func(e string) bool { return e == peer })
+
+	if p.isPieceDone(piece) {
+		piece.status = PieceDone
+	}
+}
+
+func (p *PieceManager) isPieceDone(piece *Piece) bool {
+	for _, block := range piece.blocks {
+		if block.status != BlockDone {
+			return false
+		}
+	}
+
+	return true
 }
 
 // func (p *PieceManager) MarkBlockInQueue(pi, bi int) {

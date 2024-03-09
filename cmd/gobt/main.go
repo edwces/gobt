@@ -56,7 +56,8 @@ func main() {
 		return
 	}
 
-	pp := gobt.NewPicker(metainfo.Info.Length, metainfo.Info.PieceLength)
+	pm := gobt.NewPieceManager(metainfo.Info.Length, metainfo.Info.PieceLength)
+	pp := gobt.NewPicker(metainfo.Info.Length, metainfo.Info.PieceLength, pm)
 	storage := gobt.NewStorage(metainfo.Info.Length, metainfo.Info.PieceLength)
 	clientBf := bitfield.New(len(hashes))
 	connected := gobt.NewPeersManager()
@@ -138,7 +139,7 @@ func main() {
 						return
 					}
 
-					pp.MarkBlockDone(int(block.Index), int(block.Offset)/gobt.DefaultBlockSize, peer.String())
+					pm.MarkBlockDone(int(block.Index), int(block.Offset)/gobt.DefaultBlockSize, peer.String())
 					if pp.IsBlockResolving(int(block.Index), int(block.Offset)/gobt.DefaultBlockSize) {
 						connected.WriteCancel(int(block.Index), int(block.Offset), len(block.Block), peer.String())
 					}

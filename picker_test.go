@@ -22,7 +22,8 @@ func TestPickerPick(t *testing.T) {
 	}
 
 	t.Run("strict order", func(t *testing.T) {
-		p := gobt.NewPicker(TestTorrentLength, TestTorrentPieceLength)
+		pm := gobt.NewPieceManager(TestTorrentLength, TestTorrentPieceLength)
+		p := gobt.NewPicker(TestTorrentLength, TestTorrentPieceLength, pm)
 		want := 0
 
 		for i := 0; i < 10*TestTorrentPieceBlocks; i++ {
@@ -41,7 +42,8 @@ func TestPickerPick(t *testing.T) {
 	})
 
 	t.Run("random", func(t *testing.T) {
-		p := gobt.NewPicker(TestTorrentLength, TestTorrentPieceLength)
+		pm := gobt.NewPieceManager(TestTorrentLength, TestTorrentPieceLength)
+		p := gobt.NewPicker(TestTorrentLength, TestTorrentPieceLength, pm)
 		p.SetRandSeed(0)
 
 		want := []int{20, 23, 14, 21, 17}
@@ -60,7 +62,8 @@ func TestPickerPick(t *testing.T) {
 	})
 
 	t.Run("rarest", func(t *testing.T) {
-		p := gobt.NewPicker(TestTorrentLength, TestTorrentPieceLength)
+		pm := gobt.NewPieceManager(TestTorrentLength, TestTorrentPieceLength)
+		p := gobt.NewPicker(TestTorrentLength, TestTorrentPieceLength, pm)
 		p.SetRandSeed(0)
 
 		p.IncrementPieceAvailability(15)
