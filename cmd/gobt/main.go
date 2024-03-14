@@ -87,7 +87,7 @@ func main() {
 				wg.Done()
 				return
 			}
-			peer := gobt.NewPeer(conn)
+			peer := gobt.NewPeer(conn, metainfo)
 			defer peer.Close()
 
 			err = peer.Handshake(hash, clientID)
@@ -99,14 +99,11 @@ func main() {
 
 			connected.Add(peer)
 
-			// Message loop
-			bf := bitfield.New(len(hashes))
-
 			defer func() {
 				for _, req := range peer.Requests {
 					pp.FailPendingBlock(req[0], req[1], peer.String())
 				}
-				pp.DecrementAvailability(bf)
+				pp.DecrementAvailability(peer.Bitfield)
 				connected.Remove(peer)
 				wg.Done()
 			}()
@@ -171,7 +168,7 @@ func main() {
 
 					for peer.IsRequestable() {
 						// Send request
-						cp, cb, err := pp.Pick(bf, peer.String())
+						cp, cb, err := pp.Pick(peer.Bitfield, peer.String())
 
 						if err != nil {
 							err := peer.SendNotInterested()
@@ -203,7 +200,7 @@ func main() {
 						var cp, cb int
 
 						if len(unresolved) == 0 {
-							cp, cb, err = pp.Pick(bf, peer.String())
+							cp, cb, err = pp.Pick(peer.Bitfield, peer.String())
 
 							if err != nil {
 								err := peer.SendNotInterested()
@@ -230,7 +227,7 @@ func main() {
 					peer.IsChoking = false
 				case message.IDHave:
 					have := int(msg.Payload.Have())
-					err := bf.Set(have)
+					err := peer.Bitfield.Set(have)
 
 					if err != nil {
 						fmt.Printf("Bitfield: %v\n", err)
@@ -247,31 +244,14 @@ func main() {
 						}
 					}
 				case message.IDBitfield:
-					// Define peer bitfield
-					err := bf.Replace(msg.Payload.Bitfield())
+					bf := msg.Payload.Bitfield()
+					err := peer.RecvBitfield(bf, clientBf)
+					pp.IncrementAvailability(peer.Bitfield)
+
 					if err != nil {
-						fmt.Printf("Bitfield: %v\n", err)
+						fmt.Printf("Bitfield error: %v", err)
 						return
 					}
-
-					pp.IncrementAvailability(bf)
-
-					// Calculate interesting pieces that peer has
-					diff, err := bf.Difference(clientBf)
-					if err != nil {
-						fmt.Printf("Bitfield: %v\n", err)
-						return
-					}
-
-					// Send interest status if it's not empty
-					if !diff.Empty() {
-						err := peer.SendInterested()
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-					}
-					// conn.WriteUnchoke()
 				}
 			}
 		}(peer)

@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/edwces/gobt/bitfield"
 	"github.com/edwces/gobt/handshake"
 	"github.com/edwces/gobt/message"
 )
@@ -20,7 +21,9 @@ const (
 // to have access torrent size, piece size etc.; piece state; and overral most of the modules
 // REFACTOR: Messy for now, Leaking most of the information about peer
 type Peer struct {
-	conn net.Conn
+	conn     net.Conn
+	metainfo *Metainfo
+	Bitfield bitfield.Bitfield
 
 	IsInteresting bool
 	IsChoking     bool
@@ -33,8 +36,10 @@ type Peer struct {
 	writeKeepAliveTicker *time.Ticker
 }
 
-func NewPeer(conn net.Conn) *Peer {
-	return &Peer{conn: conn, IsInteresting: false, IsChoking: true, Requests: [][]int{}, Cancelled: [][]int{}, HashFails: 0}
+func NewPeer(conn net.Conn, metainfo *Metainfo) *Peer {
+	bf := bitfield.New(CalcPieceCount(metainfo.Info.Length, metainfo.Info.PieceLength))
+
+	return &Peer{conn: conn, metainfo: metainfo, Bitfield: bf, IsInteresting: false, IsChoking: true, Requests: [][]int{}, Cancelled: [][]int{}, HashFails: 0}
 }
 
 func (p *Peer) Handshake(hash, clientID [20]byte) error {
@@ -188,6 +193,29 @@ func (p *Peer) WriteMsg(id message.ID, payload message.Payload) (int, error) {
 	}
 
 	return wb, nil
+}
+
+func (p *Peer) RecvBitfield(bf []byte, clientBf bitfield.Bitfield) error {
+	err := p.Bitfield.Replace(bf)
+	if err != nil {
+		return err
+	}
+
+	// Calculate interesting pieces that peer has
+	diff, err := p.Bitfield.Difference(clientBf)
+	if err != nil {
+		return err
+	}
+
+	// Send interest status if it's not empty
+	if !diff.Empty() {
+		err := p.SendInterested()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (p *Peer) WriteKeepAlive() (int, error) {
